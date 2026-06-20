@@ -38,19 +38,18 @@ export async function POST(request) {
         const uid = firebaseData.localId;
         const token = signToken({ uid, email, firebaseToken: firebaseData.idToken });
 
-        return NextResponse.json({
-            success: true,
-            message: 'Login successful',
-            token,
-            user: {
-                uid,
-                email,
-                displayName: firebaseData.displayName || null
-            }
+        const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url), 303);
+        redirectResponse.cookies.set('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 7 // 7 days
         });
 
+        return redirectResponse;
+
     } catch (error) {
-        console.error('Test Login error:', error);
+        console.error('Test Login Redirect error:', error);
         return NextResponse.json({
             success: false,
             message: error.message || 'Error validating credentials'

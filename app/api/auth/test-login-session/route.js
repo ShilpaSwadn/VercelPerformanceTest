@@ -39,18 +39,11 @@ export async function POST(request) {
         const token = signToken({ uid, email, firebaseToken: firebaseData.idToken });
 
         return NextResponse.json({
-            success: true,
-            message: 'Login successful',
-            token,
-            user: {
-                uid,
-                email,
-                displayName: firebaseData.displayName || null
-            }
+            session_id: token
         });
 
     } catch (error) {
-        console.error('Test Login error:', error);
+        console.error('Test Login Session error:', error);
         return NextResponse.json({
             success: false,
             message: error.message || 'Error validating credentials'
