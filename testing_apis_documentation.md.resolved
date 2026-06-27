@@ -1,0 +1,98 @@
+# Performance Testing Authentication APIs
+
+This document outlines the specialized authentication APIs created specifically for load testing (e.g., using JMeter) without incurring the heavy performance overhead of the standard application login routes.
+
+---
+
+## 1. Standard Test Login API
+**Endpoint:** `POST /api/auth/test-login`
+
+### What It Does
+Provides a lightweight authentication mechanism that bypasses standard database checks (like ensuring a user profile exists in your local DB) and directly authenticates against Firebase. It returns all user details and the authentication token in a standard JSON format.
+
+### Inside: What Happens
+1. **Validation:** Checks if the `ENABLE_TEST_LOGIN_ROUTE` environment variable is `true`. If not, returns 404.
+2. **Authentication:** Sends the provided `email` and `password` directly to Firebase Identity Toolkit (`signInWithPassword`).
+3. **Token Generation:** Upon successful Firebase login, it takes the Firebase `uid` and signs a custom JWT using your application's `signToken` utility.
+4. **Response:** Returns a 200 OK status with the generated `token` and user data.
+
+### Input
+```json
+{
+  "email": "user1@gmail.com",
+  "password": "password123"
+}
+```
+
+### Output (200 OK)
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "eyJhbGciOiJIUzI1NiIsInR...",
+  "user": {
+    "uid": "firebase_uid_123",
+    "email": "user1@gmail.com",
+    "displayName": null
+  }
+}
+```
+
+---
+
+## 2. Session ID Focused Test Login API
+**Endpoint:** `POST /api/auth/test-login-session`
+
+### What It Does
+This route is a streamlined version of the standard test login, specifically tailored for load testing tools that need a simple key-value extraction (like capturing a session ID into a JMeter variable). 
+
+### Inside: What Happens
+1. **Validation & Authentication:** Same as the standard test login (verifies environment variable, authenticates via Firebase).
+2. **Token Generation:** Generates the custom JWT.
+3. **Response:** Discards all extra user metadata and returns *only* the token wrapped in a `session_id` key.
+
+### Input
+```json
+{
+  "email": "user1@gmail.com",
+  "password": "password123"
+}
+```
+
+### Output (200 OK)
+```json
+{
+  "session_id": "eyJhbGciOiJIUzI1NiIsInR..."
+}
+```
+
+---
+
+## 3. Browser-Simulation Test Login API
+**Endpoint:** `POST /api/auth/test-login-redirect`
+
+### What It Does
+This route closely mimics a real user logging into the application through a browser. It authenticates the user, securely stores the session token in an HTTP-only cookie, and then automatically redirects the user to the dashboard. 
+
+### Inside: What Happens
+1. **Validation & Authentication:** Authenticates the user via Firebase.
+2. **Token Generation:** Generates the custom JWT.
+3. **Cookie Setting:** Creates a Next.js `NextResponse` object that instructs the client browser to set a secure `token` cookie.
+4. **Response:** Returns an HTTP 303 (See Other) redirect response pointing to `/dashboard`.
+
+### Input
+```json
+{
+  "email": "user1@gmail.com",
+  "password": "password123"
+}
+```
+
+### Output (303 See Other)
+*(No JSON body is returned. Instead, HTTP headers dictate the behavior).*
+
+**Headers returned to the client:**
+* `Set-Cookie: token=eyJhbGciOiJ...; HttpOnly; Path=/; Max-Age=604800; SameSite=Lax`
+* `Location: /dashboard`
+
+*(Your load testing tool will capture this cookie and automatically perform a `GET /dashboard` request).*
